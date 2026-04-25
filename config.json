@@ -1,0 +1,26 @@
+{
+  "host_agent": {
+    "base_url": "http://10.1.167.140:15001",
+    "token": "CHANGE_ME_TO_SOMETHING_LONG"
+  },
+  "zones": {
+    "se_living": {
+      "display_name": "SE Living",
+      "savant_zone_name": "SE Living",
+      "service_on_token": "SE Living-Sonos-Sonos_media-1-SVC_AV_SONOS-PowerOn",
+      "power_off_token": "SE Living-----PowerOff"
+    },
+    "cellar": {
+      "display_name": "Cellar",
+      "savant_zone_name": "Cellar",
+      "service_on_token": "Cellar-Test JAP Roku 3-Media_server-1-SVC_AV_EXTERNALMEDIASERVER-PowerOn",
+      "power_off_token": "Cellar-----PowerOff"
+    },
+    "loft_living": {
+      "display_name": "Loft Living",
+      "savant_zone_name": "Loft Living",
+      "service_on_token": "Loft Living-Test JAP Roku 1-Media_server-1-SVC_AV_EXTERNALMEDIASERVER-PowerOn",
+      "power_off_token": "Loft Living-----PowerOff"
+    }
+  }
+}
