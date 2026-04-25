@@ -1,3 +1,13 @@
+"""
+Deprecated prototype CLI.
+
+This CLI predates the current web UI config shape and may not work with the
+current config.json fields. The web UI is the active Pi-side control surface
+for v1 development.
+
+Do not extend this file unless the CLI is intentionally brought back into scope.
+"""
+
 #!/usr/bin/env python3
 import json
 import requests
