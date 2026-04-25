@@ -2,7 +2,9 @@ from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 import json
 import requests
-from urllib.parse import quote
+from html import escape
+from ipaddress import ip_address
+from urllib.parse import quote, urlparse
 
 CFG_PATH = "config.json"
 
@@ -14,8 +16,25 @@ def save_cfg(cfg: dict):
     with open(CFG_PATH, "w") as f:
         json.dump(cfg, f, indent=2)
 
+def validate_host_agent_base_url(base_url: str) -> str:
+    base_url = (base_url or "").strip().rstrip("/")
+    parsed = urlparse(base_url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise ValueError("Host Agent URL must be a full URL like http://10.x.x.x:15001")
+    if parsed.hostname.lower() == "localhost":
+        raise ValueError("Pi Hub config must use the Savant Host LAN IP, not localhost")
+    try:
+        host_ip = ip_address(parsed.hostname)
+    except ValueError:
+        host_ip = None
+    if host_ip and (host_ip.is_loopback or host_ip.is_unspecified):
+        raise ValueError("Pi Hub config must use the Savant Host LAN IP, not loopback or 0.0.0.0")
+    if parsed.port is None:
+        raise ValueError("Host Agent URL must include the port, usually 15001")
+    return base_url
+
 def agent_client(cfg):
-    base = cfg["host_agent"]["base_url"].rstrip("/")
+    base = validate_host_agent_base_url(cfg["host_agent"]["base_url"])
     headers = {"X-Widgets-Token": cfg["host_agent"]["token"]}
     return base, headers
 
@@ -126,6 +145,7 @@ def index():
 @app.get("/setup", response_class=HTMLResponse)
 def setup():
     cfg = load_cfg()
+    agent_cfg = cfg.get("host_agent", {})
     zones_cfg = cfg.get("zones", {})
 
     available = []
@@ -145,6 +165,8 @@ def setup():
         options += f'<option value="{z}">{z}{mark}</option>'
 
     err_html = f"<div class='banner err'>Discovery error: {err}</div>" if err else ""
+    host_url = escape(agent_cfg.get("base_url", ""))
+    host_token = escape(agent_cfg.get("token", ""))
 
     existing = "".join([
         f'<li><a href="/zone/{zid}">{zcfg.get("display_name", zid)}</a> '
@@ -155,6 +177,17 @@ def setup():
 
     body = f"""
       {err_html}
+      <h2>Savant Host Agent</h2>
+      <form method="post" action="/save_host_agent">
+        <label>Host Agent base URL:</label><br/>
+        <input name="base_url" style="width:420px;" value="{host_url}" placeholder="http://10.x.x.x:15001"/><br/>
+        <div class="small">Use the Savant Host LAN IP from the Pi Hub. Do not use 127.0.0.1 or localhost here.</div>
+        <br/>
+        <label>X-Widgets-Token:</label><br/>
+        <input name="token" style="width:420px;" value="{host_token}" /><br/><br/>
+        <button type="submit">Save Host Agent</button>
+      </form>
+
       <h2>Add Zone</h2>
       <form method="post" action="/save_zone">
         <label>Savant Zone Name:</label><br/>
@@ -170,6 +203,28 @@ def setup():
       <ul>{existing}</ul>
     """
     return html_page("Setup", body)
+
+@app.post("/save_host_agent")
+def save_host_agent(
+    base_url: str = Form(...),
+    token: str = Form(...)
+):
+    cfg = load_cfg()
+    try:
+        cleaned_base_url = validate_host_agent_base_url(base_url)
+    except ValueError as exc:
+        body = f"""
+          <div class="banner err">{exc}</div>
+          <p><a href="/setup">Back to Setup</a></p>
+        """
+        return HTMLResponse(html_page("Invalid Savant Host", body), status_code=400)
+
+    cfg["host_agent"] = {
+        "base_url": cleaned_base_url,
+        "token": token.strip(),
+    }
+    save_cfg(cfg)
+    return RedirectResponse(url="/setup", status_code=303)
 
 @app.post("/save_zone")
 def save_zone(
